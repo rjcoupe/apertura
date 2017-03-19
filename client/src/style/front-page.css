@@ -1,13 +1,15 @@
 main {
-  width: 100vw;
-  margin: 0 auto; }
+  margin: 0 auto;
+  background-color: #000; }
 
 main .masonry {
-  column-count: 3;
-  column-gap: 0; }
+  font-size: 0;
+  text-align: center; }
 
 main .masonry .image-container {
-  break-inside: avoid; }
+  display: inline-block;
+  height: 400px; }
 
 main .masonry .image-container img {
+  height: 400px;
   width: 33vw; }
