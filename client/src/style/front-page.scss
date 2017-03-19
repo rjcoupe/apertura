@@ -1,0 +1,15 @@
+main {
+  width: 100vw;
+  margin: 0 auto;
+  .masonry {
+    // width: 1200px;
+    column-count: 3;
+    column-gap: 0;
+    .image-container {
+      break-inside: avoid;
+      img {
+        width: 33vw;
+      }
+    }
+  }
+}
