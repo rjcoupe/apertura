@@ -1,0 +1,12 @@
+{
+  "mongo": {
+    "host": "mongoHost",
+    "port": 27017,
+    "db": "apertura",
+    "username": "dbuser",
+    "password": "dbpassword"
+  },
+  "web": {
+    "port": 8000
+  }
+}
