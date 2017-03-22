@@ -34,9 +34,11 @@ export default class FrontPage extends Component {
   render() {
     return (
       <main>
-        <div className="masonry">{this.state.images.map((image) => {
-          return <ImageThumbnail image={image} />
-        })}</div>
+        <div className="masonry">
+        {this.state.images.map((image) => {
+          return <ImageThumbnail image={image} key={Math.random()}/>
+        })}
+        </div>
       </main>
     )
   }
