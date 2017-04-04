@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const schema = mongoose.Schema({
-  url: { type: String, unique: true },
+  thumbnailUrl: { type: String, unique: true },
+  watermarkedUrl: { type: String, unique: true },
   md5: { type: String, unique: true },
   exif: {
     camera: {

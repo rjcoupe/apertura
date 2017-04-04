@@ -10,11 +10,13 @@ app.use(bodyParser.urlencoded({
 
 // Mongoose
 const mongoose = require('mongoose');
+mongoose.Promise = global.Promise;
 
 // Misc Utils
 const _ = require('lodash');
 const fs = require('fs');
 const colors = require('colors'); // eslint-disable-line no-unused-vars
+const path = require('path');
 
 // nConf
 const nconf = require('nconf');
@@ -40,6 +42,10 @@ _.each(controllerFiles, (file) => {
     controller.route();
     console.log(`** ${file}`.green);
   }
+});
+app.use(express.static(path.resolve(__dirname, 'client', 'build')));
+app.get('*', function (request, response) {
+  response.sendFile(path.resolve(__dirname, 'client', 'build', 'index.html'));
 });
 
 // Connect to Mongo and listen for web traffic
