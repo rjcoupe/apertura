@@ -56,7 +56,7 @@ ImageController.prototype.getImageById = function(request, response, next) {
 
 ImageController.prototype.processImageUploads = function(request, response, next) {
   request.uploadedImageIds = [];
-  async.eachLimit(request.files, 5, (file, callback) => {
+  async.eachLimit(request.files, nconf.get('imageUploadBus') || 5, (file, callback) => {
     let imageData = {};
     this.getImageMD5(file)
       .then((md5) => {
@@ -87,11 +87,17 @@ ImageController.prototype.processImageUploads = function(request, response, next
         request.uploadedImageIds.push(savedImage._id);
         callback();
       })
-      .catch(error) => {
+      .catch((error) => {
         console.log(`Error caught in promise chain: ${error}`);
         callback(error);
-      };
-  }, next);
+      });
+  }, (error) => {
+    if (error) {
+      return response.status(500).send(error);
+    } else {
+      return next();
+    }
+  });
 };
 
 ImageController.prototype.getImageMD5 = function(file) {
