@@ -13,16 +13,10 @@ const tmpfile = require('tmpfile');
 const uuid = require('uuid');
 const watermarker = require('image-watermark');
 
-const userCanUpload = require('../Restrict').userHadUploadRights;
+const userCanUpload = require('../Restrict').userHasUploadRights;
 
 function ImageController(app) {
   this.app = app;
-  const awsConfig = {
-    accessKeyId: nconf.get('aws-key'),
-    secretAccessKey: nconf.get('aws-secret'),
-    region: nconf.get('aws-region')
-  };
-  aws.config.update(awsConfig);
 }
 
 ImageController.prototype.route = function() {
@@ -44,7 +38,9 @@ ImageController.prototype.getImageById = function(request, response, next) {
       return response.sendStatus(404);
     }
     request.imageData = image;
-    return next();
+    next();
+    image.views += 1;
+    image.save();
   });
 };
 
@@ -154,6 +150,12 @@ ImageController.prototype.addWatermarkToImage = function(file) {
 
 ImageController.prototype.uploadImagesToS3 = function(paths, applyWatermark) {
   return new Promise((resolve, reject) => {
+    const awsConfig = {
+      accessKeyId: nconf.get('aws-key'),
+      secretAccessKey: nconf.get('aws-secret'),
+      region: nconf.get('aws-region')
+    };
+    aws.config.update(awsConfig);
     const s3 = new aws.S3({
       params: { Bucket: nconf.get('aws-uploadBucket') }
     });
@@ -239,9 +241,9 @@ ImageController.prototype.storeImageMetaData = function(imageData) {
   return new Promise((resolve, reject) => {
     console.log(imageData);
     const image = new ImageModel(imageData);
-    image.save((error) => {
+    image.save((error, i) => {
       if (error) return reject(error);
-      return resolve();
+      return resolve(i);
     });
   });
 };

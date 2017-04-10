@@ -3,6 +3,7 @@ const schema = mongoose.Schema({
   thumbnailUrl: { type: String, unique: true },
   watermarkedUrl: { type: String, unique: true },
   md5: { type: String, unique: true },
+  views: { type: Number, default: 0 },
   exif: {
     camera: {
       make: String,
