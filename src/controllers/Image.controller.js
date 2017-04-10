@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const ImageModel = mongoose.model('images');
 
+const _ = require('lodash');
 const async = require('async');
 const aws = require('aws-sdk');
 const crypto = require('crypto');
@@ -26,14 +27,16 @@ function ImageController(app) {
 ImageController.prototype.route = function() {
   this.app.get('/api/image/:id', this.getImageById.bind(this), this.renderData.bind(this));
   this.app.post('/api/image/upload',
-    multer({ dest: '/tmp' }).single('image'),
-    this.getImageMD5.bind(this),
-    this.checkForPreviousUpload.bind(this),
-    this.createThumbnail.bind(this),
-    this.addWatermarkToImage.bind(this),
-    this.uploadImagesToS3.bind(this),
-    this.extractExifData.bind(this),
-    this.storeImageMetaData.bind(this),
+    multer({ dest: '/tmp' }).array('images'),
+    this.processImageUploads.bind(this),
+
+    // this.getImageMD5.bind(this),
+    // this.checkForPreviousUpload.bind(this),
+    // this.createThumbnail.bind(this),
+    // this.addWatermarkToImage.bind(this),
+    // this.uploadImagesToS3.bind(this),
+    // this.extractExifData.bind(this),
+    // this.storeImageMetaData.bind(this),
     this.renderData.bind(this)
   );
 };
@@ -51,140 +54,195 @@ ImageController.prototype.getImageById = function(request, response, next) {
   });
 };
 
-ImageController.prototype.getImageMD5 = function(request, response, next) {
-  const image = request.file.path;
-  request.image = {};
-  fs.readFile(image, (error, data) => {
-    request.image.md5 = crypto.createHash('md5').update(data).digest('hex');
-    return next();
-  });
+ImageController.prototype.processImageUploads = function(request, response, next) {
+  request.uploadedImageIds = [];
+  async.eachLimit(request.files, 5, (file, callback) => {
+    let imageData = {};
+    this.getImageMD5(file)
+      .then((md5) => {
+        imageData.md5 = md5;
+        return this.checkForPreviousUpload(md5);
+      })
+      .then(() => {
+        return this.createThumbnail(file);
+      })
+      .then((thumbnailFilePath) => {
+        imageData.local.thumbnailFilePath = thumbnailFilePath;
+        return this.addWatermarkToImage(file);
+      })
+      .then((watermarkedFilePath) => {
+        imageData.local.watermarkedFilePath = watermarkedFilePath;
+        return this.uploadImagesToS3(imageData.local, request.body.applyWatermark);
+      })
+      .then((imageUrls) => {
+        imageData.watermarkedUrl = imageUrls.watermarkedUrl;
+        imageData.thumbnailUrl = imageUrls.thumbnailUrl;
+        return this.extractExifData(file);
+      })
+      .then((exifData) => {
+        imageData.exif = exifData;
+        return this.storeImageMetaData(imageData);
+      })
+      .then((savedImage) => {
+        request.uploadedImageIds.push(savedImage._id);
+        callback();
+      })
+      .catch(error) => {
+        console.log(`Error caught in promise chain: ${error}`);
+        callback(error);
+      };
+  }, next);
 };
 
-ImageController.prototype.checkForPreviousUpload = function(request, response, next) {
-  ImageModel.findOne({ md5: request.image.md5 }, (error, image) => {
-    if (image) {
-      return response.status(400).send('File already uploaded');
-    }
-    return next();
-  });
-};
-
-ImageController.prototype.createThumbnail = function(request, response, next) {
-  const thumbnailFilePath = tmpfile({ extension: 'jpg' });
-  try {
-    sharp(request.file.path)
-      .resize(400)
-      .toFile(thumbnailFilePath, (error) => {
-        if (error) {
-          return response.status(500).send('Thumbnail creation error');
-        }
-        request.thumbnailFilePath = thumbnailFilePath;
-        return next();
-      });
-  } catch (e) {
-    console.error(e);
-  }
-};
-
-ImageController.prototype.addWatermarkToImage = function(request, response, next) {
-  const watermarkFilePath = tmpfile({ extension: 'jpg' });
-  const watermarkOptions = {
-    text: nconf.get('watermark:text'),
-    dstPath: watermarkFilePath
-  };
-  watermarker.embedWatermarkWithCb(request.file.path, watermarkOptions, (error) => {
-    if (error) {
-      return response.status(500).send(`Failed adding watermark: ${error}`);
-    }
-    request.watermarkedFilePath = watermarkFilePath;
-    return next();
-  });
-};
-
-ImageController.prototype.uploadImagesToS3 = function(request, response, next) {
-  const s3 = new aws.S3({
-    params: { Bucket: nconf.get('aws-uploadBucket') }
-  });
-  const thumbnailKey = `${uuid.v4()}.jpg`;
-  const watermarkedKey = `${uuid.v4()}.jpg`;
-  const thumbnailFile = fs.readFileSync(request.thumbnailFilePath);
-  const watermarkedFile = fs.readFileSync(request.watermarkedFilePath);
-  async.parallel([
-    (callback) => {
-      s3.upload({
-        Key: thumbnailKey,
-        Body: thumbnailFile,
-        ACL: 'public-read'
-      }, (error, info) => {
-        console.error(error);
-        request.image.thumbnailUrl = info.Location;
-        callback(error, info);
-      });
-    },
-    (callback) => {
-      s3.upload({
-        Key: watermarkedKey,
-        Body: watermarkedFile,
-        ACL: 'public-read'
-      }, (error, info) => {
-        console.error(error);
-        request.image.watermarkedUrl = info.Location;
-        callback(error, info);
-      });
-    }
-  ], (error, results) => {
-    console.log(error, results);
-    if (!error) {
-      return next();
-    } else {
-
-      return response.status(500).send(`Failed to save image: ${error.message}`);
-    }
-  });
-};
-
-ImageController.prototype.extractExifData = function(request, response, next) {
-  new exifImage({ image: request.file.path }, (error, exif) => {
-    // We have to re-create the creation date because, by default, the date elements
-    // will be separated with colons, which confuses JS.
-    const createDateYear = exif.exif.CreateDate.substr(0, 4);
-    const createDateMonth = exif.exif.CreateDate.substr(5, 2);
-    const createDateDay = exif.exif.CreateDate.substr(8, 2);
-    const createDateTime = exif.exif.CreateDate.substr(11, 8);
-    const createDate = `${createDateYear}-${createDateMonth}-${createDateDay} ${createDateTime}`;
-
-    request.image.exif = {
-      camera: {
-        make: exif.image.Make,
-        model: exif.image.Model,
-        orientation: exif.image.Orientation,
-        xResolution: exif.image.XResolution,
-        yResolution: exif.image.YResolution,
-        resolutionUnit: exif.image.ResolutionUnit
-      },
-      data: {
-        fNum: exif.exif.FNumber,
-        aperture: exif.exif.ApertureValue,
-        iso: exif.exif.iso,
-        creationDate: createDate,
-        shutterSpeed: exif.exif.ShutterSpeedValue,
-        flash: (exif.exif.Flash === 1),
-        focalLength: exif.exif.FocalLength,
-        imageWidth: exif.exif.ExifImageWidth,
-        imageHeight: exif.exif.ExifImageHeight
+ImageController.prototype.getImageMD5 = function(file) {
+  return new Promise((resolve, reject) => {
+    fs.readFile(file.path, (error, data) => {
+      if (error) {
+        return reject(error);
       }
-    };
-    return next();
+      const md5 = crypto.createHash('md5').update(data).digest('hex');
+      return resolve(md5);
+    });
   });
 };
 
-ImageController.prototype.storeImageMetaData = function(request, response, next) {
-  console.log(request.image);
-  const image = new ImageModel(request.image);
-  console.log(image);
-  image.save((error) => {
-    if (error) console.error(error);
-    return next();
+ImageController.prototype.checkForPreviousUpload = function(md5) {
+  return new Promise((resolve, reject) => {
+    ImageModel.findOne({ md5: md5 }, (error, image) => {
+      if (image) {
+        return reject('File already uploaded');
+      }
+      return resolve();
+    });
+  });
+};
+
+ImageController.prototype.createThumbnail = function(file) {
+  return new Promise((resolve, reject) => {
+    const thumbnailFilePath = tmpfile({ extension: 'jpg' });
+    try {
+      sharp(file.path)
+        .resize(400)
+        .toFile(thumbnailFilePath, (error) => {
+          if (error) {
+            return reject('Thumbnail creation error');
+          }
+          return resolve(thumbnailFilePath);
+        });
+    } catch (e) {
+      return reject(e);
+    }
+  });
+
+};
+
+ImageController.prototype.addWatermarkToImage = function(file) {
+  return new Promise((resolve, reject) => {
+    const watermarkFilePath = tmpfile({ extension: 'jpg' });
+    const watermarkOptions = {
+      text: nconf.get('watermark:text'),
+      dstPath: watermarkFilePath
+    };
+    watermarker.embedWatermarkWithCb(file.path, watermarkOptions, (error) => {
+      if (error) {
+        return reject(`Failed adding watermark: ${error}`);
+      }
+      return resolve(watermarkFilePath);
+    });
+  });
+};
+
+ImageController.prototype.uploadImagesToS3 = function(paths, applyWatermark) {
+  return new Promise((resolve, reject) => {
+    const s3 = new aws.S3({
+      params: { Bucket: nconf.get('aws-uploadBucket') }
+    });
+    const thumbnailKey = `${uuid.v4()}.jpg`;
+    const watermarkedKey = `${uuid.v4()}.jpg`;
+    const thumbnailFile = fs.readFileSync(paths.thumbnailFilePath);
+    const watermarkedFile = fs.readFileSync(paths.watermarkedFilePath);
+    let results = {};
+    async.parallel([
+      (callback) => {
+        s3.upload({
+          Key: thumbnailKey,
+          Body: thumbnailFile,
+          ACL: 'public-read'
+        }, (error, info) => {
+          console.error(error);
+          callback(error, info);
+          results.thumbnailUrl = info.Location;
+        });
+      },
+      (callback) => {
+        if (applyWatermark) {
+          s3.upload({
+            Key: watermarkedKey,
+            Body: watermarkedFile,
+            ACL: 'public-read'
+          }, (error, info) => {
+            console.error(error);
+            callback(error, info);
+            results.watermarkedUrl = info.Location;
+          });
+        } else {
+          callback();
+        }
+      }
+    ], (error) => {
+      if (error) {
+        return reject(`Failed to save image: ${error.message}`);
+      }
+      return resolve(results);
+    });
+  });
+
+};
+
+ImageController.prototype.extractExifData = function(file) {
+  return new Promise((resolve) => {
+    new exifImage({ image: file.path }, (error, exif) => {
+      // We have to re-create the creation date because, by default, the date elements
+      // will be separated with colons, which confuses JS.
+      const createDateYear = exif.exif.CreateDate.substr(0, 4);
+      const createDateMonth = exif.exif.CreateDate.substr(5, 2);
+      const createDateDay = exif.exif.CreateDate.substr(8, 2);
+      const createDateTime = exif.exif.CreateDate.substr(11, 8);
+      const createDate = `${createDateYear}-${createDateMonth}-${createDateDay} ${createDateTime}`;
+
+      return resolve({
+        camera: {
+          make: exif.image.Make,
+          model: exif.image.Model,
+          orientation: exif.image.Orientation,
+          xResolution: exif.image.XResolution,
+          yResolution: exif.image.YResolution,
+          resolutionUnit: exif.image.ResolutionUnit
+        },
+        data: {
+          fNum: exif.exif.FNumber,
+          aperture: exif.exif.ApertureValue,
+          iso: exif.exif.iso,
+          creationDate: createDate,
+          shutterSpeed: exif.exif.ShutterSpeedValue,
+          flash: (exif.exif.Flash === 1),
+          focalLength: exif.exif.FocalLength,
+          imageWidth: exif.exif.ExifImageWidth,
+          imageHeight: exif.exif.ExifImageHeight
+        }
+      });
+    });
+  });
+};
+
+ImageController.prototype.storeImageMetaData = function(imageData) {
+  return new Promise((resolve, reject) => {
+    console.log(imageData);
+    const image = new ImageModel(imageData);
+    image.save((error) => {
+      if (error) return reject(error);
+      return resolve();
+    });
   });
 };
 
