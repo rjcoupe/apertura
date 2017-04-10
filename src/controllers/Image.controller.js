@@ -1,7 +1,6 @@
 const mongoose = require('mongoose');
 const ImageModel = mongoose.model('images');
 
-const _ = require('lodash');
 const async = require('async');
 const aws = require('aws-sdk');
 const crypto = require('crypto');
@@ -13,6 +12,8 @@ const sharp = require('sharp');
 const tmpfile = require('tmpfile');
 const uuid = require('uuid');
 const watermarker = require('image-watermark');
+
+const userCanUpload = require('../Restrict').userHadUploadRights;
 
 function ImageController(app) {
   this.app = app;
@@ -27,16 +28,9 @@ function ImageController(app) {
 ImageController.prototype.route = function() {
   this.app.get('/api/image/:id', this.getImageById.bind(this), this.renderData.bind(this));
   this.app.post('/api/image/upload',
+    userCanUpload,
     multer({ dest: '/tmp' }).array('images'),
     this.processImageUploads.bind(this),
-
-    // this.getImageMD5.bind(this),
-    // this.checkForPreviousUpload.bind(this),
-    // this.createThumbnail.bind(this),
-    // this.addWatermarkToImage.bind(this),
-    // this.uploadImagesToS3.bind(this),
-    // this.extractExifData.bind(this),
-    // this.storeImageMetaData.bind(this),
     this.renderData.bind(this)
   );
 };
