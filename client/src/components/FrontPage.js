@@ -6,29 +6,19 @@ export default class FrontPage extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      images: [
-        { url: 'http://lorempixel.com/1280/800/' },
-        { url: 'http://lorempixel.com/1280/800/' },
-        { url: 'http://lorempixel.com/1280/800/' },
-        { url: 'http://lorempixel.com/1280/800/' },
-        { url: 'http://lorempixel.com/1280/800/' },
-        { url: 'http://lorempixel.com/1280/800/' },
-        { url: 'http://lorempixel.com/1280/800/' },
-        { url: 'http://lorempixel.com/1280/800/' },
-        { url: 'http://lorempixel.com/1280/800/' },
-        { url: 'http://lorempixel.com/1280/800/' },
-        { url: 'http://lorempixel.com/1280/800/' },
-        { url: 'http://lorempixel.com/1280/800/' },
-        { url: 'http://lorempixel.com/1280/800/' },
-        { url: 'http://lorempixel.com/1280/800/' },
-        { url: 'http://lorempixel.com/1280/800/' },
-        { url: 'http://lorempixel.com/1280/800/' },
-        { url: 'http://lorempixel.com/1280/800/' },
-        { url: 'http://lorempixel.com/1280/800/' },
-        { url: 'http://lorempixel.com/1280/800/' },
-        { url: 'http://lorempixel.com/1280/800/' }
-      ]
+      images: []
     };
+  }
+
+  componentWillMount() {
+    fetch('/api/images')
+      .then((response) => {
+        return response.json();
+      })
+      .then((json) => {
+        this.setState({ images: json.imageData });
+        console.log(json);
+      });
   }
 
   render() {

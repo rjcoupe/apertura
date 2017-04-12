@@ -21,12 +21,28 @@ function ImageController(app) {
 
 ImageController.prototype.route = function() {
   this.app.get('/api/image/:id', this.getImageById.bind(this), this.renderData.bind(this));
+  this.app.get('/api/images', this.getImagesForFrontPage.bind(this), this.renderData.bind(this));
   this.app.post('/api/image/upload',
     userCanUpload,
     multer({ dest: '/tmp' }).array('images'),
     this.processImageUploads.bind(this),
     this.renderData.bind(this)
   );
+};
+
+ImageController.prototype.getImagesForFrontPage = function(request, response, next) {
+  ImageModel.find({}, { thumbnailUrl: 1 })
+    .sort({ views: -1, 'exif.creationDate': -1 })
+    .exec((error, images) => {
+      if (error) {
+        return response.status(500).send({ error: error });
+      }
+      if (!images) {
+        return response.sendStatus(404);
+      }
+      request.imageData = images;
+      return next();
+    });
 };
 
 ImageController.prototype.getImageById = function(request, response, next) {
@@ -249,7 +265,7 @@ ImageController.prototype.storeImageMetaData = function(imageData) {
 };
 
 ImageController.prototype.renderData = function(request, response) {
-  return response.status(200).send({ image: request.imageData });
+  return response.status(200).send({ imageData: request.imageData });
 };
 
 module.exports = ImageController;
