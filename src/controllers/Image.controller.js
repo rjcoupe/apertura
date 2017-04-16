@@ -13,36 +13,65 @@ const tmpfile = require('tmpfile');
 const uuid = require('uuid');
 const watermarker = require('image-watermark');
 
-const userCanUpload = require('../Restrict').userHasUploadRights;
+const restrict = require('../Restrict');
 
 function ImageController(app) {
   this.app = app;
 }
 
 ImageController.prototype.route = function() {
-  this.app.get('/api/image/:id', this.getImageById.bind(this), this.renderData.bind(this));
-  this.app.get('/api/images', this.getImagesForFrontPage.bind(this), this.renderData.bind(this));
+  this.app.get('/api/image/:id',
+    this.getImageById.bind(this),
+    this.renderData.bind(this));
+
+  this.app.get('/api/images/frontpage',
+    this.getImagesForFrontPage.bind(this),
+    this.renderData.bind(this));
+
+  this.app.get('/api/images/staged',
+    restrict.userCanViewStagedImages.bind(this),
+    this.getStagedImages.bind(this),
+    this.renderData.bind(this));
+
   this.app.post('/api/image/upload',
-    userCanUpload,
+    restrict.userHasUploadRights.bind(this),
     multer({ dest: '/tmp' }).array('images'),
     this.processImageUploads.bind(this),
-    this.renderData.bind(this)
-  );
+    this.renderData.bind(this));
+};
+
+ImageController.prototype.getStagedImages = function(request, response, next) {
+  ImageModel.find({
+    status: 'staged'
+  })
+  .sort({ 'exif.creationDate': 1 })
+  .populate('uploadedBy', 'firstName surname')
+  .exec((error, images) => {
+    if (error) {
+      return response.status(500).send({ error: error });
+    }
+    request.imageData = images;
+    return next();
+  });
 };
 
 ImageController.prototype.getImagesForFrontPage = function(request, response, next) {
-  ImageModel.find({}, { thumbnailUrl: 1 })
-    .sort({ views: -1, 'exif.creationDate': -1 })
-    .exec((error, images) => {
-      if (error) {
-        return response.status(500).send({ error: error });
-      }
-      if (!images) {
-        return response.sendStatus(404);
-      }
-      request.imageData = images;
-      return next();
-    });
+  ImageModel.find({
+    status: 'published',
+    public: true
+  },
+  { thumbnailUrl: 1 })
+  .sort({ views: -1, 'exif.creationDate': -1 })
+  .exec((error, images) => {
+    if (error) {
+      return response.status(500).send({ error: error });
+    }
+    if (!images) {
+      return response.sendStatus(404);
+    }
+    request.imageData = images;
+    return next();
+  });
 };
 
 ImageController.prototype.getImageById = function(request, response, next) {
@@ -60,10 +89,11 @@ ImageController.prototype.getImageById = function(request, response, next) {
   });
 };
 
-ImageController.prototype.processImageUploads = function(request, response, next) {
+ImageController.prototype.processImageUploads = function(request, response) {
   request.uploadedImageIds = [];
   async.eachLimit(request.files, nconf.get('imageUploadBus') || 5, (file, callback) => {
-    let imageData = {};
+    console.log('Handling file upload ' + file.path);
+    let imageData = { status: 'staged', albums: [], uploadedBy: request.user._id, local: {} };
     this.getImageMD5(file)
       .then((md5) => {
         imageData.md5 = md5;
@@ -74,14 +104,22 @@ ImageController.prototype.processImageUploads = function(request, response, next
       })
       .then((thumbnailFilePath) => {
         imageData.local.thumbnailFilePath = thumbnailFilePath;
-        return this.addWatermarkToImage(file);
+        if (request.body.addWatermark) {
+          return this.addWatermarkToImage(file);
+        } else {
+          return new Promise((resolve) => {
+            const filePath = tmpfile({ extension: 'jpg' });
+            fs.createReadStream(file.path).pipe(fs.createWriteStream(filePath));
+            return resolve(filePath);
+          });
+        }
       })
-      .then((watermarkedFilePath) => {
-        imageData.local.watermarkedFilePath = watermarkedFilePath;
-        return this.uploadImagesToS3(imageData.local, request.body.applyWatermark);
+      .then((fullSizeFilePath) => {
+        imageData.local.fullSizeFilePath = fullSizeFilePath;
+        return this.uploadImagesToS3(imageData.local);
       })
       .then((imageUrls) => {
-        imageData.watermarkedUrl = imageUrls.watermarkedUrl;
+        imageData.fullSizeUrl = imageUrls.fullSizeUrl;
         imageData.thumbnailUrl = imageUrls.thumbnailUrl;
         return this.extractExifData(file);
       })
@@ -94,14 +132,14 @@ ImageController.prototype.processImageUploads = function(request, response, next
         callback();
       })
       .catch((error) => {
-        console.log(`Error caught in promise chain: ${error}`);
+        console.log(`Error caught in image upload promise chain: ${error}`);
         callback(error);
       });
   }, (error) => {
     if (error) {
       return response.status(500).send(error);
     } else {
-      return next();
+      return response.send(request.uploadedImageIds);
     }
   });
 };
@@ -122,7 +160,7 @@ ImageController.prototype.checkForPreviousUpload = function(md5) {
   return new Promise((resolve, reject) => {
     ImageModel.findOne({ md5: md5 }, (error, image) => {
       if (image) {
-        return reject('File already uploaded');
+        return reject('Duplicate');
       }
       return resolve();
     });
@@ -164,7 +202,7 @@ ImageController.prototype.addWatermarkToImage = function(file) {
   });
 };
 
-ImageController.prototype.uploadImagesToS3 = function(paths, applyWatermark) {
+ImageController.prototype.uploadImagesToS3 = function(paths) {
   return new Promise((resolve, reject) => {
     const awsConfig = {
       accessKeyId: nconf.get('aws-key'),
@@ -176,9 +214,9 @@ ImageController.prototype.uploadImagesToS3 = function(paths, applyWatermark) {
       params: { Bucket: nconf.get('aws-uploadBucket') }
     });
     const thumbnailKey = `${uuid.v4()}.jpg`;
-    const watermarkedKey = `${uuid.v4()}.jpg`;
+    const fullSizeKey = `${uuid.v4()}.jpg`;
     const thumbnailFile = fs.readFileSync(paths.thumbnailFilePath);
-    const watermarkedFile = fs.readFileSync(paths.watermarkedFilePath);
+    const fullSizeFile = fs.readFileSync(paths.fullSizeFilePath);
     let results = {};
     async.parallel([
       (callback) => {
@@ -193,19 +231,15 @@ ImageController.prototype.uploadImagesToS3 = function(paths, applyWatermark) {
         });
       },
       (callback) => {
-        if (applyWatermark) {
-          s3.upload({
-            Key: watermarkedKey,
-            Body: watermarkedFile,
-            ACL: 'public-read'
-          }, (error, info) => {
-            console.error(error);
-            callback(error, info);
-            results.watermarkedUrl = info.Location;
-          });
-        } else {
-          callback();
-        }
+        s3.upload({
+          Key: fullSizeKey,
+          Body: fullSizeFile,
+          ACL: 'public-read'
+        }, (error, info) => {
+          console.error(error);
+          callback(error, info);
+          results.fullSizeUrl = info.Location;
+        });
       }
     ], (error) => {
       if (error) {
@@ -255,6 +289,7 @@ ImageController.prototype.extractExifData = function(file) {
 
 ImageController.prototype.storeImageMetaData = function(imageData) {
   return new Promise((resolve, reject) => {
+    delete imageData.local;
     console.log(imageData);
     const image = new ImageModel(imageData);
     image.save((error, i) => {

@@ -1,9 +1,13 @@
 const mongoose = require('mongoose');
 const schema = mongoose.Schema({
   thumbnailUrl: { type: String, unique: true },
-  watermarkedUrl: { type: String, unique: true },
+  fullSizeUrl: { type: String, unique: true },
   md5: { type: String, unique: true },
   views: { type: Number, default: 0 },
+  status: { type: String, index: true },
+  public: { type: Boolean, index: true, default: false },
+  albums: [{ type: mongoose.Schema.Types.ObjectId, ref: 'albums' }],
+  uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'users' },
   exif: {
     camera: {
       make: String,

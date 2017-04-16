@@ -11,13 +11,12 @@ export default class FrontPage extends Component {
   }
 
   componentWillMount() {
-    fetch('/api/images')
+    fetch('/api/images/frontpage')
       .then((response) => {
         return response.json();
       })
       .then((json) => {
         this.setState({ images: json.imageData });
-        console.log(json);
       });
   }
 

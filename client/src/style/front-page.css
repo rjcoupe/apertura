@@ -1,12 +1,15 @@
 main {
   margin: 0 auto;
   background-color: #000; }
-  main .masonry {
-    font-size: 0;
-    text-align: center; }
-    main .masonry .image-container {
-      display: inline-block;
-      height: 400px; }
-      main .masonry .image-container img {
-        height: 400px;
-        width: 33vw; }
+
+main .masonry {
+  font-size: 0;
+  text-align: center; }
+
+main .masonry .image-container {
+  display: inline-block;
+  height: 400px; }
+
+main .masonry .image-container img {
+  height: 400px;
+  width: 33vw; }

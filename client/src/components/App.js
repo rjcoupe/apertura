@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Route } from 'react-router-dom';
 
 import FrontPage from './FrontPage';
 import Header from './Header';
+import StagedImages from './StagedImages';
 import Upload from './Upload';
 
 export default class App extends Component {
@@ -12,7 +13,8 @@ export default class App extends Component {
         <div>
           <Route component={Header} />
           <Route exact path='/' component={FrontPage} />
-          <Route exact path='/upload' component={Upload} />
+          <Route exact path='/admin/upload' component={Upload} />
+          <Route exact path='/admin/staged' component={StagedImages} />
         </div>
       </Router>
     )
