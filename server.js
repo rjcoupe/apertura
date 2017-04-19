@@ -44,7 +44,7 @@ _.each(controllerFiles, (file) => {
   }
 });
 app.use(express.static(path.resolve(__dirname, 'client', 'build')));
-app.get('*', function (request, response) {
+app.get('*', (request, response) => {
   response.sendFile(path.resolve(__dirname, 'client', 'build', 'index.html'));
 });
 
@@ -56,7 +56,8 @@ if (nconf.get('mongo:username')) {
 mongoUrl += `${nconf.get('mongo:host')}:${nconf.get('mongo:port')}/${nconf.get('mongo:db')}`;
 mongoose.connect(mongoUrl);
 mongoose.connection.once('open', () => {
-  app.listen(nconf.get('web:port'), () => {
-    console.log('Webserver is listening'.green.bold);
+  const port = nconf.get('web:port');
+  app.listen(port, () => {
+    console.log(`Webserver is listening on port ${port}`.green.bold);
   });
 });

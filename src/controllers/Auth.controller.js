@@ -12,6 +12,9 @@ function AuthController(app) {
 }
 
 AuthController.prototype.route = function() {
+  this.app.get('/login', (request, response) => {
+    return response.redirect('/auth/google');
+  });
   this.app.get('/auth/logout', this.logout.bind(this));
 };
 
