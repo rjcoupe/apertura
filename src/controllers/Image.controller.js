@@ -61,7 +61,6 @@ ImageController.prototype.getStagedImages = function(request, response, next) {
 };
 
 ImageController.prototype.updateImage = function(request, response, next) {
-  console.log(request.body);
   const update = {
     public: request.body.public,
     status: request.body.status,
@@ -130,7 +129,7 @@ ImageController.prototype.processImageUploads = function(request, response) {
           return new Promise((resolve) => {
             const filePath = tmpfile({ extension: 'jpg' });
             fs.createReadStream(file.path).pipe(fs.createWriteStream(filePath));
-            return resolve(filePath);
+            return resolve(file.path);
           });
         }
       })

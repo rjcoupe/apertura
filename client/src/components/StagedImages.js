@@ -22,10 +22,6 @@ export default class StagedImages extends Component {
       });
   }
 
-  publishImage(id) {
-
-  }
-
   render() {
     return (
       <main className="image-stage">
