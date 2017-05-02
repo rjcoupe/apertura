@@ -6,6 +6,7 @@ const schema = mongoose.Schema({
   views: { type: Number, default: 0 },
   status: { type: String, index: true },
   public: { type: Boolean, index: true, default: false },
+  frontPage: { type: Boolean, index: true, default: false },
   albums: [{ type: mongoose.Schema.Types.ObjectId, ref: 'albums' }],
   uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'users' },
   exif: {

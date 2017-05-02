@@ -1,14 +1,36 @@
-main {
-  margin: 0 auto;
-  background-color: #000;
+@import 'palette';
 
+main.front-page {
+  background-color: $dark-blue;
+  min-height: 100vh;
+  width: calc(100vw - 250px);
+  margin: 0 auto;
+
+  .slideshow {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-contents: center;
+    align-items: center;
+
+    .slideshow-image-container {
+      display: hidden;
+      box-shadow: 2px 2px 2px #000;
+      transition: display 0.5s;
+      &.active {
+        display: block;
+      }
+      img {
+
+      }
+    }
+  }
   .masonry {
     font-size: 0;
     text-align: center;
     .image-container {
       display: inline-block;
       height: 400px;
-
       img {
         height: 400px;
         width: 33vw;

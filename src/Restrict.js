@@ -3,7 +3,13 @@ module.exports = {
     if (request.user && request.user.admin) {
       return next();
     }
-    console.log(`User ${request.user._id} attempted to view staged images`);
+    return response.sendStatus(403);
+  },
+
+  userCanUpdateImages: function(request, response, next) {
+    if (request.user && request.user.admin) {
+      return next();
+    }
     return response.sendStatus(403);
   },
 

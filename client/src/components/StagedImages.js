@@ -1,13 +1,15 @@
 import React, { Component } from 'react';
 
+import StagedImageContainer from './StagedImageContainer';
+
 
 export default class StagedImages extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      images: []
+      images: [],
+      formValues: {}
     };
-    this.handleFieldChange = this.handleFieldChange.bind(this);
   }
 
   componentWillMount() {
@@ -20,40 +22,16 @@ export default class StagedImages extends Component {
       });
   }
 
-  handleFieldChange(event) {
-    console.log(event.target);
+  publishImage(id) {
+
   }
 
   render() {
-    const formFields = [
-      { label: 'Visible to all', type: 'checkbox' }
-    ];
     return (
       <main className="image-stage">
         {this.state.images.map((image) => {
           return (
-            <div className="staged-image-container">
-              <img src={image.thumbnailUrl} />
-              <strong>{image.title}</strong>
-              <table>
-                {formFields.map((field) => {
-                  let fieldHtml;
-                  switch(field.type) {
-                    case 'text':
-                    case 'checkbox':
-                    case 'radio':
-                    fieldHtml = <input type={field.type} name={field.name} onChange={this.handleFieldChange} />;
-                    break;
-                  }
-                  return (
-                    <tr>
-                      <td>{field.label}</td>
-                      <td>{fieldHtml}</td>
-                    </tr>
-                  )
-                })}
-              </table>
-            </div>
+            <StagedImageContainer image={image} />
           )
         })}
       </main>

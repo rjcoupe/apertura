@@ -33,6 +33,11 @@ ImageController.prototype.route = function() {
     this.getStagedImages.bind(this),
     this.renderData.bind(this));
 
+  this.app.put('/api/image/update',
+    restrict.userCanUpdateImages.bind(this),
+    this.updateImage.bind(this),
+    this.renderData.bind(this));
+
   this.app.post('/api/image/upload',
     restrict.userHasUploadRights.bind(this),
     multer({ dest: '/tmp' }).array('images'),
@@ -55,12 +60,27 @@ ImageController.prototype.getStagedImages = function(request, response, next) {
   });
 };
 
+ImageController.prototype.updateImage = function(request, response, next) {
+  console.log(request.body);
+  const update = {
+    public: request.body.public,
+    status: request.body.status,
+    frontPage: request.body.frontPage
+  };
+  ImageModel.update({
+    _id: request.body.id
+  }, {
+    '$set': update
+  }, next);
+};
+
 ImageController.prototype.getImagesForFrontPage = function(request, response, next) {
   ImageModel.find({
     status: 'published',
+    frontPage: true,
     public: true
   },
-  { thumbnailUrl: 1 })
+  { fullSizeUrl: 1 })
   .sort({ views: -1, 'exif.creationDate': -1 })
   .exec((error, images) => {
     if (error) {
@@ -254,6 +274,9 @@ ImageController.prototype.uploadImagesToS3 = function(paths) {
 ImageController.prototype.extractExifData = function(file) {
   return new Promise((resolve) => {
     new exifImage({ image: file.path }, (error, exif) => {
+      if (error) {
+        return resolve({});
+      }
       // We have to re-create the creation date because, by default, the date elements
       // will be separated with colons, which confuses JS.
       const createDateYear = exif.exif.CreateDate.substr(0, 4);

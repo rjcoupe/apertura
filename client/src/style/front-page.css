@@ -1,12 +1,25 @@
-main {
-  margin: 0 auto;
-  background-color: #000; }
-  main .masonry {
+main.front-page {
+  background-color: #2C3D55;
+  min-height: 100vh;
+  width: calc(100vw - 250px);
+  margin: 0 auto; }
+  main.front-page .slideshow {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-contents: center;
+    align-items: center; }
+    main.front-page .slideshow .slideshow-image-container {
+      display: hidden;
+      box-shadow: 2px 2px 2px #000; }
+      main.front-page .slideshow .slideshow-image-container.active {
+        display: block; }
+  main.front-page .masonry {
     font-size: 0;
     text-align: center; }
-    main .masonry .image-container {
+    main.front-page .masonry .image-container {
       display: inline-block;
       height: 400px; }
-      main .masonry .image-container img {
+      main.front-page .masonry .image-container img {
         height: 400px;
         width: 33vw; }
