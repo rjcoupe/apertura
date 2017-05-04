@@ -4,4 +4,38 @@ nav {
   height: 100vh;
   background: $mid-blue;
   width: 250px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: center;
+
+  h1 {
+    width: 100%;
+    text-align: center;
+  }
+
+  .sidebar-items-container {
+    text-align: center;
+    font-family: "Macondo", sans-serif;
+    text-transform: uppercase;
+    font-weight: bold;
+    font-size: 1.5em;
+    a {
+      text-decoration: none;
+      color: white;
+      &:visited, &:active {
+        color: white;
+      }
+
+      .sidebar-item {
+        padding: 25px 55px;
+        margin: 10px;
+        transition: border-color 1s;
+        border: 1px solid $mid-blue;
+        &:hover {
+          border-color: #FFF;
+        }
+      }
+    }
+  }
 }

@@ -1,4 +1,29 @@
 nav {
   height: 100vh;
   background: #536271;
-  width: 250px; }
+  width: 250px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: center; }
+  nav h1 {
+    width: 100%;
+    text-align: center; }
+  nav .sidebar-items-container {
+    text-align: center;
+    font-family: "Macondo", sans-serif;
+    text-transform: uppercase;
+    font-weight: bold;
+    font-size: 1.5em; }
+    nav .sidebar-items-container a {
+      text-decoration: none;
+      color: white; }
+      nav .sidebar-items-container a:visited, nav .sidebar-items-container a:active {
+        color: white; }
+      nav .sidebar-items-container a .sidebar-item {
+        padding: 25px 55px;
+        margin: 10px;
+        transition: border-color 1s;
+        border: 1px solid #536271; }
+        nav .sidebar-items-container a .sidebar-item:hover {
+          border-color: #FFF; }

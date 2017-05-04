@@ -79,7 +79,7 @@ ImageController.prototype.getImagesForFrontPage = function(request, response, ne
     frontPage: true,
     public: true
   },
-  { fullSizeUrl: 1 })
+  { fullSizeUrl: 1, exif: 1 })
   .sort({ views: -1, 'exif.creationDate': -1 })
   .exec((error, images) => {
     if (error) {

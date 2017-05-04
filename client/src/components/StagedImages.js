@@ -7,8 +7,7 @@ export default class StagedImages extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      images: [],
-      formValues: {}
+      images: []
     };
   }
 
